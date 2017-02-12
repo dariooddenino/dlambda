@@ -9,4 +9,5 @@
                  [rhizome "0.2.7"]]
   :main ^:skip-aot dlambda.core
   :target-path "target/%s"
+  :plugins [[lein-auto "0.1.3"]]
   :profiles {:uberjar {:aot :all}})
