@@ -1,44 +1,88 @@
 (ns dlambda.parser
   (:require [instaparse.core :as insta]))
 
-(def transform-options
-  {:NAME keyword
-   :VAL read-string
-   })
+;; (def transform-options
+;;   {:NAME keyword
+;;    :VAL read-string
+;;    })
+
+(def addition
+  (insta/parser
+   "plus = plus <'+'> plus | num
+    num = #'[0-9]'+"))
+
+(def addition-right
+  (insta/parser
+   "plus = num <'+'> plus | num
+    num = #'[0-9]'+"))
+
+(def addition-left
+  (insta/parser
+   "plus = plus <'+'> num | num
+    num = #'[0-9]'+"))
+
+;; (def oldparser
+;;   (insta/parser
+;;    "<program> = lparen program rparen | program
+;;     <lparen> = space <'('>
+;;     <rparen> = <')'> space
+;;     <expr> = sfun / sname / sval
+;;     <sexpr> = space expr
+;;     APP = program program
+;;     <sapp> = space APP
+;;     FUN = <'fn'> sname space <'.'> program
+;;     <sfun> = space FUN
+;;     NAME = #'[a-zA-Z]'
+;;     <sname> = space NAME
+;;     VAL = #'[0-9]+'
+;;     <sval> = space VAL
+;;     <space> = <#'[ ]*'>
+;; "))
 
 (def parser
   (insta/parser
-   "<program> = lparen program rparen | sexpr
-    <lparen> = <'('>
-    <rparen> = <')'>
-    <expr> = sfun / sapp / sname / sval
-    <sexpr> = space expr
-    APP = program program
+   "
+    <program> = lparen sexpr rparen | sexpr
+    <lparen> = space <'('>
+    <rparen> = <')'> space
+    <expr> = FUN / NAME / VAL / APP
+    <sexpr> = space expr | lparen expr rparen
+    APP = sexpr sexpr | lparen sexpr sexpr rparen
     <sapp> = space APP
-    FUN = <'fn'> sname space <'.'> program
-    <sfun> = space FUN
+    FUN = <'fn'> sname space <'.'> sexpr
+    <sfun> = space FUN | lparen FUN rparen
     NAME = #'[a-zA-Z]'
-    <sname> = space NAME
+    <sname> = space NAME | lparen NAME rparen
     VAL = #'[0-9]+'
-    <sval> = space VAL
+    <sval> = space VAL | lparen VAL rparen
     <space> = <#'[ ]*'>
-"))
+   "))
+
+;; (defn parse [input]
+;;   (->> (parser input) (insta/transform transform-options)))
 
 (defn parse [input]
-  (->> (parser input) (insta/transform transform-options)))
+  (insta/parse parser input))
 
 (defn visual [in] (insta/visualize (parser in)))
 
-;; THIS ONE DOES NOT WORK! why?
-(parse "(fn n . fn a. (fn b . a))")
 
+(insta/parses parser "123")
+(parse "( abcde)")
 (parse "((fn x . x)3)")
 
-(insta/parses parser "((fnx.x)3)")
+(insta/parses parser "abc" :trace true)
 
-(parse "(fn f . fn x . fx)fn y . y")
+(parse "(fn f . fn x . fx) fn y . y")
 
 (parse "((fnx.fny.x)y)z")
+
+(parse "abc")
+(parse "a(b)c")
+
+(insta/parse parser "abc" :trace true)
+
+;; (insta/parses parser "abcde")
 
 ;; (interpr "(fna.(fnb.b)(fnc.c)3)")
 

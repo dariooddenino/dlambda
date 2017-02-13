@@ -7,7 +7,7 @@
   (= y N)) ;; Is this enough? Probably not...
 
 (defn nextK [id]
-  (keyword (str (name id) "'"))) ;; won't work for more complex cases!
+  (keyword (str (name (second id)) "'"))) ;; won't work for more complex cases!
 
 (defn alphareduce [M x z]
   (match M
@@ -32,21 +32,35 @@
   (match expr
          ;;  [:VAL x] (read-string x)
          ;;  [:NAME x] (keyword x)
-         [:FUN x ([:APP y z] :as w)] [:FUN x (dreduce w)]
+         [:FUN x ([:APP y z] :as w)] (dreduce [:FUN x (dreduce w)])
+         [:FUN x [:VAL y]] [:VAL y]
+         [:FUN x [:NAME y]] [:NAME y]
+         [:FUN x y] [:FUN x (dreduce y)]
          [:APP [:NAME x] [:NAME y]] [:APP [:NAME x] [:NAME y]]
          [:APP [:NAME x] [:VAL y]] [:VAL y]
          [:APP [:FUN x M] N] (dreduce [:APPFUN M x N])
          [:APPFUN M x N] (betareduce M x N)
          [:APP e N] (dreduce [:APP (dreduce e) N])
+         [:APP x] (dreduce x)
          :else expr))
 
 (defn interpr [x] (dreduce (first (parse x))))
 
-(interpr "(fn n . (fn )")
+(interpr "(fn n . (fn n .a))")
 
-(parse "(fn n . (fn a . (fn b . a (n a b)))")
+(interpr "(fn n . (fn a . (fn b . a (n a b))))3")
 
 (interpr "((fnx.fny.x)y)z")
 
+(interpr "fna.3")
+
+(interpr "fna.b")
+
+(interpr "fn a . ((fn b . b) 3)")
+
+(interpr "(fn s . (fn z . z))(3)2")
+
+(interpr "(fn a . a3)(fn s . (fn z . z))")
+
 (interpr "(fna.(fnb.b)(fnc.c)3)")
-(interpr "(fnn.(fna.(fnb.a(nab)))(fns.(fnz.z)))")
+(interpr "(fnn.(fna.(fnb.(((an)a)b))))(fns.(fnz.z))")
