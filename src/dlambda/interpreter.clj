@@ -1,7 +1,8 @@
 (ns dlambda.interpreter
   (:require [clojure.core.match :refer [match]]
-            [dlambda.parser :refer [parse]]))
-
+            [dlambda.parser :refer [parse]]
+            [clojure.walk :as walk])
+  (:use [clojure.walk]))
 
 (defn isFree [y N]
   (= y N)) ;; Is this enough? Probably not...
@@ -28,55 +29,71 @@
          [:APP e1 e2] [:APP (betareduce e1 x N) (betareduce e2 x N)]
          :else M))
 
-(defn olddreduce [expr]
-  (match expr
-         ;;  [:VAL x] (read-string x)
-         ;;  [:NAME x] (keyword x)
-         [:FUN x ([:APP y z] :as w)] (dreduce [:FUN x (dreduce w)])
-         [:FUN x [:VAL y]] [:VAL y]
-         [:FUN x [:NAME y]] [:NAME y]
-         [:FUN x y] [:FUN x (dreduce y)]
-         [:APP [:NAME x] [:NAME y]] [:APP [:NAME x] [:NAME y]]
-         [:APP [:NAME x] [:VAL y]] [:VAL y]
-         [:APP [:FUN x M] N] (let [res (betareduce M x N)] (dreduce res)) ;; (dreduce (betareduce M x N))
-  ;;       [:APPFUN M x N] (betareduce M x N)
-         [:APP e N] (dreduce [:APP (dreduce e) N])
-         [:APP x] (dreduce x)
-         :else expr))
+(defn pop-dl-n [stack n]
+  (loop [i n s stack t []]
+    (if (= i 0)
+      [s t]
+      (recur (dec i) (pop s) (conj t (peek s))))))
 
-(defn dreduce [expr]
-  (match expr
-       ;;  [:FUN _ [:VAL x]] [:VAL x]
-       ;;  [:FUN _ [:NAME x]] [:NAME x]
-         [:FUN x y] [:FUN x (dreduce y)]
-         [:APP [:FUN x M] N] (dreduce [:APPFUN M x N])
-         [:APP ([:APP _ _] :as a) e] (dreduce [:APP (dreduce a) e])
-         [:APP e ([:APP _ _] :as a)] (dreduce [:APP e (dreduce a)])
-         [:APPFUN M x N] (dreduce (betareduce M x N))
-         :else expr))
+(defn elab [op args]
+  (let [rargs (vec (rseq args))]
+    (case op
+      :APP (match rargs
+                  [[:FUN x M] N] (betareduce M x N)
+                  :else (vec (concat [:APP] rargs)))
+      (vec (concat [op] rargs)))))
 
+(defn build-dl-traversal [tree]
+  (loop [stack [tree] traversal []]
+    (if (empty? stack)
+      traversal
+      (let [e (peek stack)
+            s (pop stack)]
+        (if (coll? e)
+          (recur (into s (rest e))
+                 (conj traversal {:op (first e) :count (count (rest e))}))
+          (recur s (conj traversal {:arg e})))))))
 
-(defn interpr [x] (dreduce (first (parse x))))
+(defn eval-dl-traversal [traversal]
+  (loop [op-stack traversal arg-stack []]
+    (if (empty? op-stack)
+      (peek arg-stack)
+      (let [o (peek op-stack)
+            s (pop op-stack)]
+        (if-let [a (:arg o)]
+          (recur s (conj arg-stack a))
+          (let [[args op-args] (pop-dl-n arg-stack (:count o))]
+            (recur s (conj args (elab (:op o) op-args)))
+            ))))))
 
-(interpr "(fn n . (fn b .a))")
+(defn eval-dl-tree [tree] (-> tree build-dl-traversal eval-dl-traversal))
+
+(defn dleval [expr]
+  (let [tree (first (parse expr))]
+    (loop [res (eval-dl-tree tree)]
+      (let [res2 (eval-dl-tree res)]
+        (if (= res res2)
+          res
+          (recur res2))))))
+
+;; (dleval "(fn n . (fn b .a))")
 
 ;; (interpr "(fn n . (fn a . (fn b . a (n a b))))3")
 
-(interpr "((fnx.fny.x)y)z")
+;; (dleval "(fnx.fny.x)y") ;; I think the problem is with alpha reducing...
 
-(interpr "(fna.a)3")
+(dleval "(fna.a)3")
 
-(interpr "fna.b")
+(dleval "fna.b")
 
-(interpr "fn a . ((fn b . b) 3)")
+(dleval "fn a . ((fn b . b) 3)")
 
-(interpr "((fn s . (fn z . z))3)2")
+(dleval "((fn s . (fn z . z))3)2")
 
-(interpr "(fn a . a3)(fn s . (fn z . z))")
+(dleval "(fn a . a3)(fn s . (fn z . z))")
 
-(interpr "(fna.(fnb.b)(fnc.c)3)")
+(dleval "(fna.(fnb.b)(fnc.c)3)")
 ;; get 1 from 0
-(interpr "(fnn.(fna.(fnb.a((na)b))))(fns.(fnz.z))")
+(dleval "(fnn.(fna.(fnb.a((na)b))))(fns.(fnz.z))")
 ;; get 2 from 1
-(interpr "(fnn.(fna.(fnb.a((na)b))))(fns.(fnz.sz))")
-i
+(dleval "(fnn.(fna.(fnb.a((na)b))))(fns.(fnz.sz))")

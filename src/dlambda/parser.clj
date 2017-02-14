@@ -1,10 +1,10 @@
 (ns dlambda.parser
   (:require [instaparse.core :as insta]))
 
-;; (def transform-options
-;;   {:NAME keyword
-;;    :VAL read-string
-;;    })
+(def transform-options
+  {:NAME keyword
+   :VAL read-string
+   })
 
 (def addition
   (insta/parser
@@ -67,11 +67,11 @@
 ;; app app
 ;; (fun ) app
 
-;; (defn parse [input]
-;;   (->> (parser input) (insta/transform transform-options)))
-
 (defn parse [input]
-  (insta/parse parser input))
+  (->> (parser input) (insta/transform transform-options)))
+
+;; (defn parse [input]
+;;   (insta/parse parser input))
 
 (defn visual [in] (insta/visualize (parser in)))
 
@@ -82,6 +82,7 @@
 
 (insta/parses parser "abc" :trace true)
 
+(visual "(fn a . a3)(fn s. (fn z . z))")
 
 ;;(visual "(fn f . fn x . (fx)) fn y . y")
 
