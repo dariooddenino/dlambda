@@ -21,31 +21,30 @@
    "plus = plus <'+'> num | num
     num = #'[0-9]'+"))
 
-;; (def oldparser
-;;   (insta/parser
-;;    "<program> = lparen program rparen | program
-;;     <lparen> = space <'('>
-;;     <rparen> = <')'> space
-;;     <expr> = sfun / sname / sval
-;;     <sexpr> = space expr
-;;     APP = program program
-;;     <sapp> = space APP
-;;     FUN = <'fn'> sname space <'.'> program
-;;     <sfun> = space FUN
-;;     NAME = #'[a-zA-Z]'
-;;     <sname> = space NAME
-;;     VAL = #'[0-9]+'
-;;     <sval> = space VAL
-;;     <space> = <#'[ ]*'>
-;; "))
-
 (def parser
+  (insta/parser
+   "<program> = lparen expr rparen / expr
+    <expr> = sfun / sname / sval / sapp
+    APP = lparen sfun rparen program / sapp program / program program
+    <sapp> = space APP
+    FUN = <'fn'> sname space <'.'> program
+    <sfun> = space FUN
+    NAME = #'[a-zA-Z]'
+    <sname> = space NAME
+    VAL = #'[0-9]+'
+    <sval> = space VAL
+    <lparen> = space <'('>
+    <rparen> = <')'> space
+    <space> = <#'[ ]*'>
+"))
+
+(def oldparser
   (insta/parser
    "
     <program> = lparen sexpr rparen | sexpr
     <lparen> = space <'('>
     <rparen> = <')'> space
-    <expr> = FUN / NAME / VAL / APP
+    <expr> = FUN / APP / NAME / VAL
     <sexpr> = space expr | lparen expr rparen
     APP = sexpr sexpr | lparen sexpr sexpr rparen
     <sapp> = space APP
@@ -58,6 +57,16 @@
     <space> = <#'[ ]*'>
    "))
 
+;; applications are left associative
+;; applications have higher precedence over abstractions
+
+;; correct applications:
+;; a b
+;; a 3
+;; 3 a
+;; app app
+;; (fun ) app
+
 ;; (defn parse [input]
 ;;   (->> (parser input) (insta/transform transform-options)))
 
@@ -67,13 +76,16 @@
 (defn visual [in] (insta/visualize (parser in)))
 
 
-(insta/parses parser "123")
-(parse "( abcde)")
-(parse "((fn x . x)3)")
+(insta/parses parser "abc")
+(parse "abcde")
+(parse "(fn x . xyz)")
 
 (insta/parses parser "abc" :trace true)
 
-(parse "(fn f . fn x . fx) fn y . y")
+
+;;(visual "(fn f . fn x . (fx)) fn y . y")
+
+(parse "fn f . f x")
 
 (parse "((fnx.fny.x)y)z")
 
@@ -81,6 +93,8 @@
 (parse "a(b)c")
 
 (insta/parse parser "abc" :trace true)
+
+;; (visual "(fn n . fn a . fn b . a (n a b))3")
 
 ;; (insta/parses parser "abcde")
 
